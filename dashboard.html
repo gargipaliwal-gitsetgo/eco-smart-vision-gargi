@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Smart Waste System</title>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="theme-light">
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay">
+        <div class="loader">
+            <i class="ph ph-recycle ph-spin" style="font-size: 4rem; color: var(--primary);"></i>
+            <p style="margin-top: 1rem; font-weight: 500;">Syncing Tamil Nadu Sensors...</p>
+        </div>
+    </div>
+
+    <!-- Background element for glassmorphism vibes -->
+    <div class="bg-shape bg-shape-1"></div>
+    <div class="bg-shape bg-shape-2"></div>
+    <div class="bg-shape bg-shape-3"></div>
+
+    <!-- User Reporting Modal -->
+    <div id="reportModal" class="modal-backdrop hidden">
+        <div class="modal glass-panel">
+            <div class="modal-header">
+                <h2>Report Bin Status</h2>
+                <button class="icon-btn-sm" onclick="toggleReportModal()"><i class="ph ph-x"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Location / Bin ID</label>
+                    <input type="text" id="reportLocation" class="form-input" placeholder="e.g. Chennai Central or BIN-001">
+                </div>
+                <div class="form-group" style="margin-top: 1rem;">
+                    <label>Status</label>
+                    <select id="reportStatus" class="form-input">
+                        <option value="Full">Full (Needs Collection)</option>
+                        <option value="Medium">Medium</option>
+                        <option value="Empty">Empty (False Alarm)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer" style="margin-top: 1.5rem; display: flex; justify-content: flex-end; gap: 0.5rem;">
+                <button class="text-btn" onclick="toggleReportModal()">Cancel</button>
+                <button class="btn-primary" onclick="submitReport()">Submit Report</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Floating Action Button for quick report -->
+    <button class="fab btn-primary" onclick="toggleReportModal()" title="Report Bin">
+        <i class="ph ph-plus"></i>
+    </button>
+
+    <div class="dashboard-container">
+        <!-- Top Navbar -->
+        <nav class="navbar glass-panel">
+            <div class="nav-left">
+                <i class="ph ph-recycle logo-icon"></i>
+                <h1>Smart Waste Dashboard</h1>
+            </div>
+            <div class="nav-center live-clock">
+                <i class="ph ph-clock"></i>
+                <span id="live-time">00:00:00</span>
+                <span id="live-date">...</span>
+            </div>
+            <div class="nav-right">
+                <button id="theme-toggle" class="icon-btn" aria-label="Toggle Theme">
+                    <i class="ph ph-moon"></i>
+                </button>
+                <div class="notification-wrapper">
+                    <button class="icon-btn" aria-label="Notifications">
+                        <i class="ph ph-bell"></i>
+                        <span class="notification-badge" id="nav-badge">0</span>
+                    </button>
+                </div>
+                
+                <div class="user-profile" id="profile-container" style="position:relative; cursor:pointer;">
+                    <div class="avatar" id="nav-avatar">A</div>
+                    <!-- Profile Dropdown Menu -->
+                    <div class="profile-dropdown glass-panel hidden" id="profile-dropdown">
+                        <div class="dropdown-header">
+                            <h3 id="dropdown-name" style="margin:0; font-size:1rem; color:var(--text-main);">Admin User</h3>
+                            <p id="dropdown-email" style="margin:0; font-size:0.8rem; color:var(--text-muted);">admin@smartcity.gov</p>
+                        </div>
+                        <div class="dropdown-body">
+                            <span class="role-badge" id="dropdown-role">Admin</span>
+                        </div>
+                        <div class="dropdown-footer">
+                            <button class="btn-outline logout-btn" style="color:var(--primary); border-color:var(--primary); background:transparent;" onclick="window.location.href='index.html'"><i class="ph ph-house"></i> Home / AI Scanner</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Secondary Toolbar -->
+        <div class="toolbar glass-panel">
+            <div class="toolbar-search">
+                <i class="ph ph-magnifying-glass"></i>
+                <input type="text" id="searchInput" placeholder="Search by Bin ID or Location...">
+            </div>
+            <div class="toolbar-actions">
+                <button class="btn-outline" id="filterFullBtn"><i class="ph ph-funnel"></i> Full Bins Only</button>
+                <button class="btn-outline" onclick="exportToCSV()"><i class="ph ph-download-simple"></i> Download Report</button>
+                <button class="btn-primary" onclick="toggleReportModal()"><i class="ph ph-warning"></i> Report Issue</button>
+            </div>
+        </div>
+
+        <div id="role-msg-panel" style="display:none; color: var(--text-main); font-weight: 500; font-size: 0.9em; padding: 0.5rem 1rem; background: var(--yellow-bg); border-radius: 8px; border: 1px solid var(--yellow);">
+        </div>
+
+        <main class="dashboard-content" id="admin-view">
+            <!-- Overview Cards -->
+            <section class="overview-grid">
+                <div class="card glass-panel interactive">
+                    <div class="card-icon blue"><i class="ph ph-trash"></i></div>
+                    <div class="card-info">
+                        <h3>Total Bins</h3>
+                        <p id="stat-total">0</p>
+                    </div>
+                </div>
+                <div class="card glass-panel interactive">
+                    <div class="card-icon red"><i class="ph ph-warning-circle"></i></div>
+                    <div class="card-info">
+                        <h3>Bins Full (Critical)</h3>
+                        <p id="stat-full" class="text-red">0</p>
+                    </div>
+                </div>
+                <div class="card glass-panel interactive">
+                    <div class="card-icon yellow"><i class="ph ph-battery-medium"></i></div>
+                    <div class="card-info">
+                        <h3>Bins Half Filled</h3>
+                        <p id="stat-half">0</p>
+                    </div>
+                </div>
+                <div class="card glass-panel interactive">
+                    <div class="card-icon green"><i class="ph ph-check-circle"></i></div>
+                    <div class="card-info">
+                        <h3>Bins Empty</h3>
+                        <p id="stat-empty">0</p>
+                    </div>
+                </div>
+                <div class="card glass-panel interactive">
+                    <div class="card-icon purple"><i class="ph ph-bell-ringing"></i></div>
+                    <div class="card-info">
+                        <h3>Active Alerts</h3>
+                        <p id="stat-alerts">0</p>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Citizen Engagement Panel -->
+            <section class="overview-grid" style="grid-template-columns: repeat(3, 1fr) !important; margin-top: -0.5rem;">
+                <div class="card glass-panel interactive">
+                    <div class="card-info">
+                        <h3 style="color:var(--blue)">Citizen Reports Total</h3>
+                        <p id="stat-reports-total">0</p>
+                    </div>
+                </div>
+                <div class="card glass-panel interactive">
+                    <div class="card-info">
+                        <h3 style="color:var(--yellow)">Pending Reports</h3>
+                        <p id="stat-reports-pending">0</p>
+                    </div>
+                </div>
+                <div class="card glass-panel interactive">
+                    <div class="card-info">
+                        <h3 style="color:var(--green)">Resolved Reports</h3>
+                        <p id="stat-reports-resolved">0</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Main Layout (Strict 2-Column Grid) -->
+            <section class="main-layout-grid">
+                <!-- LEFT: Real-Time Map -->
+                <div class="map-container glass-panel">
+                    <div class="panel-header" style="flex-shrink: 0; display:flex; justify-content:space-between;">
+                        <div style="display:flex; align-items:center; gap:0.5rem;">
+                            <h2>Real-Time Map</h2>
+                        </div>
+                        <div style="display:flex; gap:0.5rem;">
+                            <button class="icon-btn-sm text-btn" id="heatmapToggleBtn" title="Show Heatmap"><i class="ph ph-fire"></i></button>
+                            <button class="icon-btn-sm text-btn" id="optimizeRouteBtn" title="Calculate Route"><i class="ph ph-path"></i> Optimize Route</button>
+                        </div>
+                    </div>
+                    <div class="map-wrapper" style="position: relative; flex: 1; min-height: 400px; width: 100%;">
+                        <div id="map"></div>
+                    </div>
+                </div>
+                
+                <!-- RIGHT: Alerts Panel & Predictive Insights -->
+                <div style="display:flex; flex-direction:column; gap:1.5rem;">
+                    
+                    <div class="ai-panel glass-panel">
+                        <div class="panel-header">
+                            <h2><i class="ph ph-magic-wand" style="color:var(--purple)"></i> Predictive Analytics <span class="badge-glow">Live AI</span></h2>
+                        </div>
+                        <div id="predictive-box" style="font-size:0.9rem; padding: 0.5rem 0;">
+                            <p style="color:var(--text-muted); text-align:center;">Analyzing sensor growth data...</p>
+                        </div>
+                    </div>
+                    
+                    <div class="alerts-container glass-panel" style="flex:1;">
+                        <div class="panel-header" style="flex-shrink: 0;">
+                            <h2>Smart Alerts</h2>
+                            <button id="clear-alerts" class="text-btn">Clear All</button>
+                        </div>
+                        <ul id="alerts-list" class="alerts-list">
+                            <!-- Alerts generated by JS -->
+                        </ul>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Charts Layout -->
+            <section class="charts-grid">
+                <div class="chart-wrapper glass-panel interactive">
+                    <div class="panel-header">
+                        <h2>Average Fill Trend</h2>
+                    </div>
+                    <div class="canvas-container">
+                        <canvas id="fillTrendChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-wrapper glass-panel interactive">
+                    <div class="panel-header">
+                        <h2>Waste Type Mix</h2>
+                    </div>
+                    <div class="canvas-container">
+                        <canvas id="wasteTypeChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-wrapper glass-panel interactive">
+                    <div class="panel-header">
+                        <h2>Collection Efficiency</h2>
+                        <p class="subtitle">Collections per day</p>
+                    </div>
+                    <div class="canvas-container">
+                        <canvas id="efficiencyChart"></canvas>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Table Section -->
+            <section class="details-section">
+                <div class="table-container glass-panel">
+                    <div class="panel-header">
+                        <h2>Bin Status Table</h2>
+                        <p class="subtitle" id="table-subtitle">Showing all bins</p>
+                    </div>
+                    <div class="table-responsive">
+                        <table id="bin-table">
+                            <thead>
+                                <tr>
+                                    <th>Bin ID</th>
+                                    <th>Location</th>
+                                    <th>Fill Level</th>
+                                    <th>Waste Type</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Rows generated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Audio element for voice alert -->
+    <audio id="alertSound" src="https://www.soundjay.com/buttons/sounds/button-10.mp3" preload="auto"></audio>
+
+    <!-- Leaflet JS & Leaflet Heat -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
+    
+    <!-- Chart JS -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- App Logic -->
+    <script src="app.js"></script>
+</body>
+</html>
