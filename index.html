@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Waste Management</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --primary: #10b981;
+            --secondary: #059669;
+            --dark-bg: #061811;
+            --glass-bg: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --text-main: #ecfdf5;
+            --text-muted: #a7f3d0;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--dark-bg);
+            color: var(--text-main);
+            overflow-x: hidden;
+            scroll-behavior: smooth;
+        }
+
+        /* Dynamic Background Animation */
+        .bg-animation {
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            z-index: -1;
+            overflow: hidden;
+            background: radial-gradient(circle at 15% 50%, rgba(16, 185, 129, 0.15), transparent 50%),
+                        radial-gradient(circle at 85% 30%, rgba(5, 150, 105, 0.15), transparent 50%);
+        }
+
+        .floating-element {
+            position: absolute;
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(5, 150, 105, 0.05));
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 50%;
+            animation: float 15s infinite ease-in-out;
+        }
+
+        @keyframes float {
+            0% { transform: translateY(0) rotate(0deg) scale(1); }
+            50% { transform: translateY(-100px) rotate(180deg) scale(1.1); }
+            100% { transform: translateY(0) rotate(360deg) scale(1); }
+        }
+
+        /* Layout */
+        section {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 4rem 2rem 100px 2rem;
+            position: relative;
+            box-sizing: border-box;
+        }
+
+        /* Glass Container */
+        .glass-panel {
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.4);
+            padding: 3rem;
+            width: 100%;
+            max-width: 600px;
+            text-align: center;
+            opacity: 0;
+            transform: translateY(30px);
+            transition: opacity 0.8s ease, transform 0.8s ease;
+        }
+        
+        .glass-panel.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        h1 {
+            font-weight: 800;
+            font-size: 3rem;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(to right, #6ee7b7, #10b981);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        p.subtitle {
+            font-size: 1.2rem;
+            color: var(--text-muted);
+            margin-bottom: 2.5rem;
+        }
+
+        /* Upload Area */
+        .upload-area {
+            border: 2px dashed var(--primary);
+            border-radius: 16px;
+            padding: 2rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            background: rgba(16, 185, 129, 0.05);
+            margin-bottom: 1.5rem;
+        }
+
+        .upload-area:hover {
+            background: rgba(16, 185, 129, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .upload-area i {
+            font-size: 3rem;
+            color: var(--primary);
+            margin-bottom: 1rem;
+        }
+
+        input[type="file"] {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        /* Buttons Component */
+        .btn {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            border: none;
+            padding: 1rem 2.5rem;
+            font-size: 1.1rem;
+            font-weight: 600;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        .btn:hover {
+            transform: translateY(-3px) scale(1.02);
+            box-shadow: 0 8px 25px rgba(16, 185, 129, 0.5);
+        }
+
+        .btn:active {
+            transform: translateY(1px);
+        }
+
+        /* Image Preview */
+        .preview-container {
+            display: none;
+            margin: 1.5rem auto;
+            position: relative;
+            width: 100%;
+            max-width: 220px;
+            height: 180px;
+            border-radius: 16px;
+            overflow: hidden;
+            box-sizing: border-box;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            border: 1px solid var(--glass-border);
+        }
+        
+        #preview {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* Result Tag */
+        .result-tag {
+            display: inline-block;
+            margin-top: 1.5rem;
+            padding: 10px 25px;
+            border-radius: 30px;
+            font-weight: 600;
+            font-size: 1.2rem;
+            opacity: 0;
+            transform: scale(0.9);
+            transition: all 0.4s ease;
+        }
+
+        .result-tag.show {
+            opacity: 1;
+            transform: scale(1);
+        }
+        
+        .tag-plastic { background: rgba(239, 68, 68, 0.15); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.5); }
+        .tag-wet { background: rgba(16, 185, 129, 0.15); color: #6ee7b7; border: 1px solid rgba(16, 185, 129, 0.5); }
+        .tag-metal { background: rgba(59, 130, 246, 0.15); color: #93c5fd; border: 1px solid rgba(59, 130, 246, 0.5); }
+        .tag-unknown { background: rgba(156, 163, 175, 0.15); color: #d1d5db; border: 1px solid rgba(156, 163, 175, 0.5); }
+
+        /* Scroll Down Indicator */
+        .scroll-indicator {
+            position: absolute;
+            bottom: 20px;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: color 0.3s;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .scroll-indicator:hover {
+            color: var(--primary);
+        }
+
+        .scroll-indicator i {
+            font-size: 1.5rem;
+            animation: bounce 2s infinite;
+        }
+
+        @keyframes bounce {
+            0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+            40% { transform: translateY(-10px); }
+            60% { transform: translateY(-5px); }
+        }
+
+        /* Enhanced Flip Cards Dashboard */
+        #dashboard {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .dash-title {
+            text-align: center;
+            margin-bottom: 3rem;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.6s ease;
+        }
+        
+        .dash-title.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 2.5rem;
+            width: 100%;
+        }
+
+        .card {
+            height: 380px;
+            perspective: 1500px;
+            opacity: 0;
+            transform: translateY(40px);
+            transition: all 0.6s ease;
+        }
+
+        .card.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Staggered animation delays for cards */
+        .card:nth-child(1) { transition-delay: 0.1s; }
+        .card:nth-child(2) { transition-delay: 0.2s; }
+        .card:nth-child(3) { transition-delay: 0.3s; }
+
+        .inner {
+            width: 100%;
+            height: 100%;
+            transition: transform 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            transform-style: preserve-3d;
+            position: relative;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.3);
+            border-radius: 24px;
+        }
+
+        .card:hover .inner {
+            transform: rotateY(180deg);
+        }
+
+        .front, .back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 24px;
+            backface-visibility: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem;
+            box-sizing: border-box;
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            backdrop-filter: blur(12px);
+        }
+
+        /* Card Front Styles */
+        .front {
+            background: linear-gradient(145deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+        }
+
+        .front i {
+            font-size: 4rem;
+            margin-bottom: 1.5rem;
+            background: linear-gradient(to bottom right, var(--primary), #34d399);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            filter: drop-shadow(0 4px 10px rgba(16,185,129,0.3));
+        }
+        
+        .front h3 {
+            font-size: 1.8rem;
+            margin: 0 0 0.5rem 0;
+            font-weight: 600;
+        }
+
+        /* Card Back Styles */
+        .back {
+            transform: rotateY(180deg);
+            background: linear-gradient(145deg, rgba(16,185,129,0.1), rgba(5,150,105,0.05));
+            border-color: rgba(16,185,129,0.3);
+        }
+
+        .back h3 {
+            margin-top: 0;
+            font-size: 1.6rem;
+            margin-bottom: 1.5rem;
+            border-bottom: 2px solid rgba(16,185,129,0.5);
+            padding-bottom: 0.5rem;
+            color: var(--primary);
+            width: 100%;
+            text-align: center;
+        }
+
+        /* Lists and Stats */
+        ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            width: 100%;
+            max-height: 220px;
+            overflow-y: auto;
+        }
+
+        ul::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        ul::-webkit-scrollbar-thumb {
+            background: var(--primary);
+            border-radius: 3px;
+        }
+
+        li {
+            background: rgba(255,255,255,0.05);
+            margin-bottom: 10px;
+            padding: 12px 15px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 1.1rem;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            margin-bottom: 15px;
+            font-size: 1.2rem;
+            background: rgba(0,0,0,0.25);
+            padding: 15px;
+            border-radius: 12px;
+            box-sizing: border-box;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .stat-amount {
+            font-weight: 800;
+            color: var(--text-main);
+        }
+
+        #binStatus {
+            font-size: 2.8rem;
+            font-weight: 800;
+            margin: 15px 0 5px 0;
+            text-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+
+        .status-empty { color: #10b981; }
+        .status-half { color: #fbbf24; }
+        .status-full { color: #ef4444; animation: pulse 1s infinite alternate; }
+
+        @keyframes pulse {
+            from { transform: scale(1); text-shadow: 0 0 15px rgba(239, 68, 68, 0.5); }
+            to { transform: scale(1.05); text-shadow: 0 0 35px rgba(239, 68, 68, 0.8); }
+        }
+
+        .alert-msg {
+            background: rgba(239, 68, 68, 0.2);
+            color: #fca5a5;
+            padding: 10px 20px;
+            border-radius: 10px;
+            font-weight: 600;
+            display: none;
+            border: 1px solid rgba(239, 68, 68, 0.5);
+            margin-top: 10px;
+        }
+        
+        .alert-msg.show {
+            display: block;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            h1 { font-size: 2.2rem; }
+            .glass-panel { padding: 2rem; width: 85%; }
+            .grid { grid-template-columns: 1fr; }
+            .card { height: 350px; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Background Animation -->
+    <div class="bg-animation" id="bgObjects"></div>
+
+    <!-- MAIN HERO SECTION -->
+    <section id="home">
+        <div class="glass-panel observe-me">
+            <h1>EcoSmart Vision</h1>
+            <p class="subtitle">AI-Powered Waste Segregation</p>
+
+            <div class="upload-area" id="dropZone">
+                <i class="fa-solid fa-cloud-arrow-up"></i>
+                <p>Drag & Drop an image here or</p>
+                <div style="font-size: 1.1rem; color: #a7f3d0;"><strong>Browse Files</strong></div>
+                <input type="file" id="imageInput" accept="image/*">
+            </div>
+
+            <div class="preview-container">
+                <img id="preview" alt="Preview">
+            </div>
+
+            <button class="btn" onclick="classifyImage()">
+                <i class="fa-solid fa-microchip"></i> Classify Waste
+            </button>
+
+            <br>
+            <div id="result" class="result-tag"></div>
+        </div>
+
+        <a href="#dashboard" class="scroll-indicator">
+            <p>Scroll for Analytics</p>
+            <i class="fa-solid fa-chevron-down"></i>
+        </a>
+    </section>
+
+    <!-- DASHBOARD SECTION -->
+    <section id="dashboard">
+        <div class="dash-title observe-me">
+            <h1>System Analytics</h1>
+            <p class="subtitle">Real-time waste sorting metrics</p>
+        </div>
+
+        <div class="grid">
+            
+            <!-- History Card -->
+            <div class="card observe-me">
+                <div class="inner">
+                    <div class="front">
+                        <i class="fa-solid fa-clock-rotate-left"></i>
+                        <h3>History</h3>
+                        <p style="color: var(--text-muted)">Hover to view log</p>
+                    </div>
+                    <div class="back">
+                        <h3>Recent Scans</h3>
+                        <ul id="historyList">
+                            <li style="color: var(--text-muted); justify-content: center; background: none; border: none;">No items scanned yet</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Statistics Card -->
+            <div class="card observe-me">
+                <div class="inner">
+                    <div class="front">
+                        <i class="fa-solid fa-chart-pie"></i>
+                        <h3>Statistics</h3>
+                        <p style="color: var(--text-muted)">Hover to view stats</p>
+                    </div>
+                    <div class="back">
+                        <h3>Distribution</h3>
+                        <div style="width: 100%">
+                            <div class="stat-item">
+                                <span><i class="fa-solid fa-bottle-water" style="color:#fca5a5; margin-right:10px;"></i>Plastic</span>
+                                <span class="stat-amount" id="stat-plastic">0</span>
+                            </div>
+                            <div class="stat-item">
+                                <span><i class="fa-solid fa-leaf" style="color:#6ee7b7; margin-right:10px;"></i>Wet Waste</span>
+                                <span class="stat-amount" id="stat-wet">0</span>
+                            </div>
+                            <div class="stat-item">
+                                <span><i class="fa-solid fa-box-archive" style="color:#93c5fd; margin-right:10px;"></i>Metal</span>
+                                <span class="stat-amount" id="stat-metal">0</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bin Status Card -->
+            <div class="card observe-me">
+                <div class="inner">
+                    <div class="front">
+                        <i class="fa-solid fa-trash-can"></i>
+                        <h3>Bin Capacity</h3>
+                        <p style="color: var(--text-muted)">Hover to check status</p>
+                    </div>
+                    <div class="back">
+                        <h3>Current Level</h3>
+                        <div id="binStatus" class="status-empty">Empty</div>
+                        <p style="color: var(--text-muted); margin-bottom: 20px" id="binPercentage">0% Full</p>
+                        <div class="alert-msg" id="alertMsg">
+                            <i class="fa-solid fa-triangle-exclamation"></i> Action Required: Empty Bin!
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </section>
+
+    <script>
+        // Generated Background Elements
+        const bgContainer = document.getElementById('bgObjects');
+        for (let i = 0; i < 18; i++) {
+            let el = document.createElement('div');
+            el.className = 'floating-element';
+            
+            // Random properties
+            let size = Math.random() * 120 + 40;
+            let left = Math.random() * 100;
+            let top = Math.random() * 100;
+            let delay = Math.random() * 5;
+            let duration = Math.random() * 15 + 15;
+            
+            el.style.width = `${size}px`;
+            el.style.height = `${size}px`;
+            el.style.left = `${left}vw`;
+            el.style.top = `${top}vh`;
+            el.style.animationDelay = `${delay}s`;
+            el.style.animationDuration = `${duration}s`;
+            
+            // Randomly make some circles, some squircle
+            el.style.borderRadius = Math.random() > 0.5 ? '50%' : '35%';
+            
+            bgContainer.appendChild(el);
+        }
+
+        // Intersection Observer for scroll animations
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('show');
+                }
+            });
+        }, { threshold: 0.15 });
+
+        document.querySelectorAll('.observe-me').forEach(el => observer.observe(el));
+
+        // Logic functionality
+        let database = [];
+
+        // File handling UI
+        const imageInput = document.getElementById("imageInput");
+        const dropZone = document.getElementById("dropZone");
+        const previewBlock = document.querySelector(".preview-container");
+        const previewImg = document.getElementById("preview");
+        const resultTag = document.getElementById("result");
+
+        imageInput.addEventListener("change", handleFile);
+        
+        dropZone.addEventListener("dragover", (e) => {
+            e.preventDefault();
+            dropZone.style.borderColor = "#34d399";
+            dropZone.style.background = "rgba(16, 185, 129, 0.15)";
+        });
+
+        dropZone.addEventListener("dragleave", (e) => {
+            e.preventDefault();
+            dropZone.style.borderColor = "var(--primary)";
+            dropZone.style.background = "rgba(16, 185, 129, 0.05)";
+        });
+
+        dropZone.addEventListener("drop", (e) => {
+            e.preventDefault();
+            dropZone.style.borderColor = "var(--primary)";
+            dropZone.style.background = "rgba(16, 185, 129, 0.05)";
+            
+            if (e.dataTransfer.files.length) {
+                imageInput.files = e.dataTransfer.files;
+                handleFile();
+            }
+        });
+
+        function handleFile() {
+            let file = imageInput.files[0];
+            if (file) {
+                previewImg.src = URL.createObjectURL(file);
+                previewBlock.style.display = "block";
+                resultTag.classList.remove('show'); // hide previous result
+            }
+        }
+
+        function classifyImage() {
+            let file = imageInput.files[0];
+            if (!file) {
+                alert("Please upload or drag an image first!");
+                return;
+            }
+
+            // Simple demo logic based on filename
+            let name = file.name.toLowerCase();
+            let resultType = "";
+            let icon = "";
+            let tagClass = "";
+
+            if (name.includes("plastic") || name.includes("bottle")) {
+                resultType = "Plastic";
+                icon = '<i class="fa-solid fa-bottle-water"></i> ';
+                tagClass = 'tag-plastic';
+            }
+            else if (name.includes("food") || name.includes("banana") || name.includes("apple") || name.includes("leaf")) {
+                resultType = "Wet Waste";
+                icon = '<i class="fa-solid fa-leaf"></i> ';
+                tagClass = 'tag-wet';
+            }
+            else if (name.includes("metal") || name.includes("can")) {
+                resultType = "Metal";
+                icon = '<i class="fa-solid fa-box-archive"></i> ';
+                tagClass = 'tag-metal';
+            }
+            else {
+                resultType = "Unknown";
+                icon = '<i class="fa-solid fa-circle-question"></i> ';
+                tagClass = 'tag-unknown';
+            }
+
+            // Update Result Tag UI
+            resultTag.innerHTML = `${icon} Detected: ${resultType}`;
+            resultTag.className = `result-tag show ${tagClass}`;
+
+            // Add to DB and update metrics
+            database.push({ type: resultType, icon: icon });
+            updateDashboard();
+        }
+
+        function updateDashboard() {
+            // Update History
+            let list = document.getElementById("historyList");
+            list.innerHTML = "";
+            
+            // Reverse so newest is on top
+            [...database].reverse().forEach(item => {
+                let li = document.createElement("li");
+                li.innerHTML = `<span style="font-size:1.3rem;">${item.icon}</span> <span>${item.type}</span>`;
+                list.appendChild(li);
+            });
+
+            // Update Stats
+            let p=0, w=0, m=0;
+            database.forEach(item => {
+                if(item.type === "Plastic") p++;
+                if(item.type === "Wet Waste") w++;
+                if(item.type === "Metal") m++;
+            });
+
+            document.getElementById("stat-plastic").innerText = p;
+            document.getElementById("stat-wet").innerText = w;
+            document.getElementById("stat-metal").innerText = m;
+
+            // Update Bin Capacity Demo (Max 6 for demo purposes)
+            let total = database.length;
+            let maxCapacity = 6;
+            let percent = Math.min(Math.round((total / maxCapacity) * 100), 100);
+            
+            let statusEl = document.getElementById("binStatus");
+            let percentEl = document.getElementById("binPercentage");
+            let alertEl = document.getElementById("alertMsg");
+
+            percentEl.innerText = `${percent}% Full`;
+
+            if(total < 3) {
+                statusEl.innerText = "Empty";
+                statusEl.className = "status-empty";
+                alertEl.classList.remove('show');
+            }
+            else if(total < 6) {
+                statusEl.innerText = "Filling Up";
+                statusEl.className = "status-half";
+                alertEl.classList.remove('show');
+            }
+            else {
+                statusEl.innerText = "FULL";
+                statusEl.className = "status-full";
+                alertEl.classList.add('show');
+            }
+        }
+    </script>
+
+</body>
+</html>
