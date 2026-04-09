@@ -7,6 +7,10 @@
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
+    <!-- TensorFlow.js and MobileNet -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@latest"></script>
+    
     <style>
         :root {
             --primary: #10b981;
@@ -204,6 +208,7 @@
         .tag-plastic { background: rgba(239, 68, 68, 0.15); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.5); }
         .tag-wet { background: rgba(16, 185, 129, 0.15); color: #6ee7b7; border: 1px solid rgba(16, 185, 129, 0.5); }
         .tag-metal { background: rgba(59, 130, 246, 0.15); color: #93c5fd; border: 1px solid rgba(59, 130, 246, 0.5); }
+        .tag-mixed { background: rgba(139, 92, 246, 0.15); color: #d8b4fe; border: 1px solid rgba(139, 92, 246, 0.5); }
         .tag-unknown { background: rgba(156, 163, 175, 0.15); color: #d1d5db; border: 1px solid rgba(156, 163, 175, 0.5); }
 
         /* Scroll Down Indicator */
@@ -530,6 +535,10 @@
                                 <span><i class="fa-solid fa-box-archive" style="color:#93c5fd; margin-right:10px;"></i>Metal</span>
                                 <span class="stat-amount" id="stat-metal">0</span>
                             </div>
+                            <div class="stat-item" style="padding-bottom: 5px; margin-bottom: 5px;">
+                                <span><i class="fa-solid fa-recycle" style="color:#d8b4fe; margin-right:10px;"></i>Mixed</span>
+                                <span class="stat-amount" id="stat-mixed">0</span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -639,47 +648,75 @@
             }
         }
 
-        function classifyImage() {
+        let aiModel = null;
+        
+        async function loadAI() {
+            if (!aiModel) {
+                resultTag.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Initializing Neural Network...`;
+                resultTag.className = `result-tag show tag-unknown`;
+                aiModel = await mobilenet.load();
+            }
+        }
+
+        async function classifyImage() {
             let file = imageInput.files[0];
             if (!file) {
                 alert("Please upload or drag an image first!");
                 return;
             }
 
-            // Simple demo logic based on filename
-            let name = file.name.toLowerCase();
-            let resultType = "";
-            let icon = "";
-            let tagClass = "";
+            await loadAI();
 
-            if (name.includes("plastic") || name.includes("bottle")) {
+            resultTag.innerHTML = `<i class="fa-solid fa-microchip fa-beat"></i> Analyzing Image Pixels...`;
+            resultTag.className = `result-tag show tag-unknown`;
+
+            // Wait briefly for UI to update before blocking execution
+            await new Promise(r => setTimeout(r, 50));
+
+            // Run pixel analysis using the neural network
+            const predictions = await aiModel.classify(previewImg);
+            
+            // Extract core identifier from AI output
+            let predictedObject = predictions[0].className.toLowerCase();
+            console.log("AI Detected: ", predictedObject);
+
+            let resultType = "Mixed";
+            let icon = '<i class="fa-solid fa-recycle"></i> ';
+            let tagClass = 'tag-mixed';
+
+            // Mapping heuristic
+            const plasticWords = ['bottle', 'plastic', 'cup', 'jug', 'container'];
+            const wetWords = ['fruit', 'food', 'banana', 'apple', 'orange', 'strawberry', 'vegetable', 'leaf', 'flower', 'meat', 'bread'];
+            const metalWords = ['can', 'tin', 'aluminum', 'metal', 'tool', 'spoon', 'fork', 'knife'];
+
+            if (plasticWords.some(w => predictedObject.includes(w))) {
                 resultType = "Plastic";
                 icon = '<i class="fa-solid fa-bottle-water"></i> ';
                 tagClass = 'tag-plastic';
-            }
-            else if (name.includes("food") || name.includes("banana") || name.includes("apple") || name.includes("leaf")) {
+            } 
+            else if (wetWords.some(w => predictedObject.includes(w))) {
                 resultType = "Wet Waste";
                 icon = '<i class="fa-solid fa-leaf"></i> ';
                 tagClass = 'tag-wet';
-            }
-            else if (name.includes("metal") || name.includes("can")) {
+            } 
+            else if (metalWords.some(w => predictedObject.includes(w))) {
                 resultType = "Metal";
                 icon = '<i class="fa-solid fa-box-archive"></i> ';
                 tagClass = 'tag-metal';
             }
-            else {
-                resultType = "Unknown";
-                icon = '<i class="fa-solid fa-circle-question"></i> ';
-                tagClass = 'tag-unknown';
-            }
 
-            // Update Result Tag UI
-            resultTag.innerHTML = `${icon} Detected: ${resultType}`;
-            resultTag.className = `result-tag show ${tagClass}`;
+            // Simulate slight processing overhead
+            setTimeout(() => {
+                let aiConfidence = Math.round(predictions[0].probability * 100);
+                let textObj = predictedObject.split(',')[0]; // parse cleanest name
 
-            // Add to DB and update metrics
-            database.push({ type: resultType, icon: icon });
-            updateDashboard();
+                resultTag.innerHTML = `${icon} <b>${resultType}</b> <span style="font-size:0.8rem; opacity:0.8;">(Found: ${textObj} @ ${aiConfidence}%)</span>`;
+                resultTag.className = `result-tag show ${tagClass}`;
+
+                // Add to DB and update metrics
+                database.push({ type: resultType, icon: icon });
+                updateDashboard();
+            }, 500);
         }
 
         function updateDashboard() {
@@ -695,16 +732,18 @@
             });
 
             // Update Stats
-            let p=0, w=0, m=0;
+            let p=0, w=0, m=0, mix=0;
             database.forEach(item => {
                 if(item.type === "Plastic") p++;
                 if(item.type === "Wet Waste") w++;
                 if(item.type === "Metal") m++;
+                if(item.type === "Mixed") mix++;
             });
 
             document.getElementById("stat-plastic").innerText = p;
             document.getElementById("stat-wet").innerText = w;
             document.getElementById("stat-metal").innerText = m;
+            document.getElementById("stat-mixed").innerText = mix;
 
             // Update Bin Capacity Demo (Max 6 for demo purposes)
             let total = database.length;
