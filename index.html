@@ -676,30 +676,30 @@
             // Run pixel analysis using the neural network
             const predictions = await aiModel.classify(previewImg);
             
-            // Extract core identifier from AI output
-            let predictedObject = predictions[0].className.toLowerCase();
-            console.log("AI Detected: ", predictedObject);
+            // Combine the top 3 predictions to be much more robust!
+            let allPredictions = predictions.map(p => p.className.toLowerCase()).join(" | ");
+            console.log("AI Detected: ", allPredictions);
 
             let resultType = "Mixed";
             let icon = '<i class="fa-solid fa-recycle"></i> ';
             let tagClass = 'tag-mixed';
 
-            // Mapping heuristic
-            const plasticWords = ['bottle', 'plastic', 'cup', 'jug', 'container'];
-            const wetWords = ['fruit', 'food', 'banana', 'apple', 'orange', 'strawberry', 'vegetable', 'leaf', 'flower', 'meat', 'bread'];
-            const metalWords = ['can', 'tin', 'aluminum', 'metal', 'tool', 'spoon', 'fork', 'knife'];
+            // Expanded Mapping heuristic for better accuracy
+            const plasticWords = ['bottle', 'plastic', 'cup', 'jug', 'container', 'bag', 'bucket', 'pitcher', 'nipple', 'pacifier', 'packaging'];
+            const wetWords = ['fruit', 'food', 'banana', 'apple', 'orange', 'strawberry', 'vegetable', 'leaf', 'flower', 'meat', 'bread', 'plant', 'mushroom', 'produce'];
+            const metalWords = ['can', 'tin', 'aluminum', 'metal', 'tool', 'spoon', 'fork', 'knife', 'pot', 'pan', 'steel', 'iron'];
 
-            if (plasticWords.some(w => predictedObject.includes(w))) {
+            if (plasticWords.some(w => allPredictions.includes(w))) {
                 resultType = "Plastic";
                 icon = '<i class="fa-solid fa-bottle-water"></i> ';
                 tagClass = 'tag-plastic';
             } 
-            else if (wetWords.some(w => predictedObject.includes(w))) {
+            else if (wetWords.some(w => allPredictions.includes(w))) {
                 resultType = "Wet Waste";
                 icon = '<i class="fa-solid fa-leaf"></i> ';
                 tagClass = 'tag-wet';
             } 
-            else if (metalWords.some(w => predictedObject.includes(w))) {
+            else if (metalWords.some(w => allPredictions.includes(w))) {
                 resultType = "Metal";
                 icon = '<i class="fa-solid fa-box-archive"></i> ';
                 tagClass = 'tag-metal';
@@ -708,7 +708,7 @@
             // Simulate slight processing overhead
             setTimeout(() => {
                 let aiConfidence = Math.round(predictions[0].probability * 100);
-                let textObj = predictedObject.split(',')[0]; // parse cleanest name
+                let textObj = predictions[0].className.split(',')[0].toLowerCase(); // cleanly display the top prediction
 
                 resultTag.innerHTML = `${icon} <b>${resultType}</b> <span style="font-size:0.8rem; opacity:0.8;">(Found: ${textObj} @ ${aiConfidence}%)</span>`;
                 resultTag.className = `result-tag show ${tagClass}`;
