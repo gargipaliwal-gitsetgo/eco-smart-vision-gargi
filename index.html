@@ -652,11 +652,16 @@
         
         async function loadAI() {
             if (!aiModel) {
-                resultTag.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Initializing Custom Local Neural Network...`;
+                resultTag.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Initiating Deep Learning Download...`;
                 resultTag.className = `result-tag show tag-unknown`;
                 
-                // Load our absolute custom TFJS model from the folder
-                aiModel = await tf.loadLayersModel('./tfjs_waste_model/model.json');
+                // Load our absolute custom TFJS model from the folder with a progress tracker!
+                aiModel = await tf.loadLayersModel('./tfjs_waste_model/model.json', {
+                    onProgress: (fraction) => {
+                        let percent = Math.round(fraction * 100);
+                        resultTag.innerHTML = `<i class="fa-solid fa-download fa-bounce"></i> Downloading AI Brain... <b>${percent}%</b>`;
+                    }
+                });
             }
         }
 
