@@ -675,8 +675,11 @@
             try {
                 await loadAI();
             } catch (err) {
-                alert("Error loading AI Model. If you are testing locally, browsers block local JSON files for security. Please test on the Live GitHub Page!");
+                alert(`Technical Error: ${err.message}. If this says 'Failed to fetch', you are STILL testing locally by clicking the desktop file instead of using the Live GitHub Link!`);
                 console.error(err);
+                
+                resultTag.innerHTML = `Error: ${err.message}`;
+                resultTag.className = `result-tag show tag-unknown`;
                 return;
             }
 
