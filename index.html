@@ -652,9 +652,11 @@
         
         async function loadAI() {
             if (!aiModel) {
-                resultTag.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Initializing Neural Network...`;
+                resultTag.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Initializing Custom Local Neural Network...`;
                 resultTag.className = `result-tag show tag-unknown`;
-                aiModel = await mobilenet.load();
+                
+                // Load our absolute custom TFJS model from the folder
+                aiModel = await tf.loadLayersModel('./tfjs_waste_model/model.json');
             }
         }
 
@@ -665,58 +667,80 @@
                 return;
             }
 
-            await loadAI();
+            try {
+                await loadAI();
+            } catch (err) {
+                alert("Error loading AI Model. If you are testing locally, browsers block local JSON files for security. Please test on the Live GitHub Page!");
+                console.error(err);
+                return;
+            }
 
-            resultTag.innerHTML = `<i class="fa-solid fa-microchip fa-beat"></i> Analyzing Image Pixels...`;
+            resultTag.innerHTML = `<i class="fa-solid fa-microchip fa-beat"></i> Running Custom AI Tensor Analysis...`;
             resultTag.className = `result-tag show tag-unknown`;
 
-            // Wait briefly for UI to update before blocking execution
+            // Wait briefly for UI to update
             await new Promise(r => setTimeout(r, 50));
 
-            // Run pixel analysis using the neural network
-            const predictions = await aiModel.classify(previewImg);
+            // 1. Convert Image to Tensor
+            // The custom model was trained on 224x224 RGB images
+            const imgTensor = tf.browser.fromPixels(previewImg)
+                                .resizeNearestNeighbor([224, 224])
+                                .toFloat()
+                                .expandDims(0); // Shapes it to [1, 224, 224, 3]
+
+            // 2. Predict using the custom weights!
+            const predictionTensor = await aiModel.predict(imgTensor);
+            const probabilities = await predictionTensor.data();
             
-            // Combine the top 3 predictions to be much more robust!
-            let allPredictions = predictions.map(p => p.className.toLowerCase()).join(" | ");
-            console.log("AI Detected: ", allPredictions);
+            // 3. Map to exact Output Classes
+            // The Python training script sorted folders alphabetically: [metal, mixed, plastic, wet_waste]
+            const classNames = ['Metal', 'Mixed', 'Plastic', 'Wet Waste'];
+            
+            // Find highest probability
+            let maxIndex = 0;
+            let maxProb = 0;
+            for(let i=0; i<probabilities.length; i++) {
+                if(probabilities[i] > maxProb) {
+                    maxProb = probabilities[i];
+                    maxIndex = i;
+                }
+            }
 
-            let resultType = "Mixed";
-            let icon = '<i class="fa-solid fa-recycle"></i> ';
-            let tagClass = 'tag-mixed';
+            let resultType = classNames[maxIndex];
+            console.log(`Custom AI Output: ${resultType} @ ${Math.round(maxProb*100)}%`);
 
-            // Expanded Mapping heuristic for better accuracy
-            const plasticWords = ['bottle', 'plastic', 'cup', 'jug', 'container', 'bag', 'bucket', 'pitcher', 'nipple', 'pacifier', 'packaging'];
-            const wetWords = ['fruit', 'food', 'banana', 'apple', 'orange', 'strawberry', 'vegetable', 'leaf', 'flower', 'meat', 'bread', 'plant', 'mushroom', 'produce'];
-            const metalWords = ['can', 'tin', 'aluminum', 'metal', 'tool', 'spoon', 'fork', 'knife', 'pot', 'pan', 'steel', 'iron'];
+            let icon = '';
+            let tagClass = '';
 
-            if (plasticWords.some(w => allPredictions.includes(w))) {
-                resultType = "Plastic";
+            // Apply direct category styling
+            if (resultType === "Plastic") {
                 icon = '<i class="fa-solid fa-bottle-water"></i> ';
                 tagClass = 'tag-plastic';
             } 
-            else if (wetWords.some(w => allPredictions.includes(w))) {
-                resultType = "Wet Waste";
+            else if (resultType === "Wet Waste") {
                 icon = '<i class="fa-solid fa-leaf"></i> ';
                 tagClass = 'tag-wet';
             } 
-            else if (metalWords.some(w => allPredictions.includes(w))) {
-                resultType = "Metal";
+            else if (resultType === "Metal") {
                 icon = '<i class="fa-solid fa-box-archive"></i> ';
                 tagClass = 'tag-metal';
+            }
+            else { 
+                icon = '<i class="fa-solid fa-recycle"></i> ';
+                tagClass = 'tag-mixed';
             }
 
             // Simulate slight processing overhead
             setTimeout(() => {
-                let aiConfidence = Math.round(predictions[0].probability * 100);
-                let textObj = predictions[0].className.split(',')[0].toLowerCase(); // cleanly display the top prediction
+                let aiConfidence = Math.round(maxProb * 100);
 
-                resultTag.innerHTML = `${icon} <b>${resultType}</b> <span style="font-size:0.8rem; opacity:0.8;">(Found: ${textObj} @ ${aiConfidence}%)</span>`;
+                resultTag.innerHTML = `${icon} <b>${resultType}</b> <span style="font-size:0.8rem; opacity:0.8;">(AI Confidence: ${aiConfidence}%)</span>`;
                 resultTag.className = `result-tag show ${tagClass}`;
 
                 // Add to DB and update metrics
                 database.push({ type: resultType, icon: icon });
                 updateDashboard();
-            }, 500);
+            }, 300);
         }
 
         function updateDashboard() {

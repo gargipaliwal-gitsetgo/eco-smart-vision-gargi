@@ -15,11 +15,14 @@ Instructions:
 2. Run this on Google Colab to utilize free GPUs!
 """
 
+import os
+# Fix for Google Colab's latest TensorFlow 2.16+ update breaking TFJS exports
+os.environ["TF_USE_LEGACY_KERAS"] = "1" 
+
 import tensorflow as tf
 from tensorflow.keras.applications import MobileNetV2
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, GlobalAveragePooling2D, Dropout
-import os
 
 print("TensorFlow Version:", tf.__version__)
 
