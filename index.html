@@ -535,10 +535,6 @@
                                 <span><i class="fa-solid fa-box-archive" style="color:#93c5fd; margin-right:10px;"></i>Metal</span>
                                 <span class="stat-amount" id="stat-metal">0</span>
                             </div>
-                            <div class="stat-item" style="padding-bottom: 5px; margin-bottom: 5px;">
-                                <span><i class="fa-solid fa-recycle" style="color:#d8b4fe; margin-right:10px;"></i>Mixed</span>
-                                <span class="stat-amount" id="stat-mixed">0</span>
-                            </div>
                         </div>
                     </div>
                 </div>
@@ -652,16 +648,11 @@
         
         async function loadAI() {
             if (!aiModel) {
-                resultTag.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Initiating Deep Learning Download...`;
+                resultTag.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Initializing Fast Neural Network...`;
                 resultTag.className = `result-tag show tag-unknown`;
                 
-                // Load our absolute custom TFJS model from the folder with a progress tracker!
-                aiModel = await tf.loadLayersModel('./tfjs_waste_model/model.json', {
-                    onProgress: (fraction) => {
-                        let percent = Math.round(fraction * 100);
-                        resultTag.innerHTML = `<i class="fa-solid fa-download fa-bounce"></i> Downloading AI Brain... <b>${percent}%</b>`;
-                    }
-                });
+                // Generic Web MobileNet (Insanely fast and robust)
+                aiModel = await mobilenet.load();
             }
         }
 
@@ -683,66 +674,49 @@
                 return;
             }
 
-            resultTag.innerHTML = `<i class="fa-solid fa-microchip fa-beat"></i> Running Custom AI Tensor Analysis...`;
+            resultTag.innerHTML = `<i class="fa-solid fa-microchip fa-beat"></i> Analyzing Image Pixels...`;
             resultTag.className = `result-tag show tag-unknown`;
 
             // Wait briefly for UI to update
             await new Promise(r => setTimeout(r, 50));
 
-            // 1. Convert Image to Tensor
-            // The custom model was trained on 224x224 RGB images
-            const imgTensor = tf.browser.fromPixels(previewImg)
-                                .resizeNearestNeighbor([224, 224])
-                                .toFloat()
-                                .expandDims(0); // Shapes it to [1, 224, 224, 3]
-
-            // 2. Predict using the custom weights!
-            const predictionTensor = await aiModel.predict(imgTensor);
-            const probabilities = await predictionTensor.data();
+            // Run pixel analysis using the neural network
+            const predictions = await aiModel.classify(previewImg);
             
-            // 3. Map to exact Output Classes
-            // The Python training script sorted folders alphabetically: [metal, mixed, plastic, wet_waste]
-            const classNames = ['Metal', 'Mixed', 'Plastic', 'Wet Waste'];
-            
-            // Find highest probability
-            let maxIndex = 0;
-            let maxProb = 0;
-            for(let i=0; i<probabilities.length; i++) {
-                if(probabilities[i] > maxProb) {
-                    maxProb = probabilities[i];
-                    maxIndex = i;
-                }
-            }
+            // Combine top 3 predictions
+            let allPredictions = predictions.map(p => p.className.toLowerCase()).join(" | ");
 
-            let resultType = classNames[maxIndex];
-            console.log(`Custom AI Output: ${resultType} @ ${Math.round(maxProb*100)}%`);
+            let resultType = "Unknown";
+            let icon = '<i class="fa-solid fa-circle-question"></i> ';
+            let tagClass = 'tag-unknown';
 
-            let icon = '';
-            let tagClass = '';
+            // Heuristic Dictionary
+            const plasticWords = ['bottle', 'plastic', 'cup', 'jug', 'container', 'bag', 'bucket', 'pitcher', 'nipple', 'pacifier', 'packaging'];
+            const wetWords = ['fruit', 'food', 'banana', 'apple', 'orange', 'strawberry', 'vegetable', 'leaf', 'flower', 'meat', 'bread', 'plant', 'mushroom', 'produce'];
+            const metalWords = ['can', 'tin', 'aluminum', 'metal', 'tool', 'spoon', 'fork', 'knife', 'pot', 'pan', 'steel', 'iron'];
 
-            // Apply direct category styling
-            if (resultType === "Plastic") {
+            if (plasticWords.some(w => allPredictions.includes(w))) {
+                resultType = "Plastic";
                 icon = '<i class="fa-solid fa-bottle-water"></i> ';
                 tagClass = 'tag-plastic';
             } 
-            else if (resultType === "Wet Waste") {
+            else if (wetWords.some(w => allPredictions.includes(w))) {
+                resultType = "Wet Waste";
                 icon = '<i class="fa-solid fa-leaf"></i> ';
                 tagClass = 'tag-wet';
             } 
-            else if (resultType === "Metal") {
+            else if (metalWords.some(w => allPredictions.includes(w))) {
+                resultType = "Metal";
                 icon = '<i class="fa-solid fa-box-archive"></i> ';
                 tagClass = 'tag-metal';
-            }
-            else { 
-                icon = '<i class="fa-solid fa-recycle"></i> ';
-                tagClass = 'tag-mixed';
             }
 
             // Simulate slight processing overhead
             setTimeout(() => {
-                let aiConfidence = Math.round(maxProb * 100);
+                let aiConfidence = Math.round(predictions[0].probability * 100);
+                let textObj = predictions[0].className.split(',')[0].toLowerCase();
 
-                resultTag.innerHTML = `${icon} <b>${resultType}</b> <span style="font-size:0.8rem; opacity:0.8;">(AI Confidence: ${aiConfidence}%)</span>`;
+                resultTag.innerHTML = `${icon} <b>${resultType}</b> <span style="font-size:0.8rem; opacity:0.8;">(Found: ${textObj} @ ${aiConfidence}%)</span>`;
                 resultTag.className = `result-tag show ${tagClass}`;
 
                 // Add to DB and update metrics
@@ -764,18 +738,17 @@
             });
 
             // Update Stats
-            let p=0, w=0, m=0, mix=0;
+            let p=0, w=0, m=0;
             database.forEach(item => {
                 if(item.type === "Plastic") p++;
                 if(item.type === "Wet Waste") w++;
                 if(item.type === "Metal") m++;
-                if(item.type === "Mixed") mix++;
             });
 
             document.getElementById("stat-plastic").innerText = p;
             document.getElementById("stat-wet").innerText = w;
             document.getElementById("stat-metal").innerText = m;
-            document.getElementById("stat-mixed").innerText = mix;
+            // Mixed logic entirely removed from logic flow
 
             // Update Bin Capacity Demo (Max 6 for demo purposes)
             let total = database.length;
